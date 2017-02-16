@@ -19,6 +19,8 @@
 // Other includes
 #include "Shader.h"
 #include "Camera.h"
+#include "Mesh.h"
+#include "Model.h"
 
 
 // Function prototypes
@@ -27,13 +29,13 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void do_movement();
 
-// Window dimensions
-const GLuint WIDTH = 800, HEIGHT = 600;
+// Properties
+GLuint screenWidth = 800, screenHeight = 600;
 
 // Camera
 Camera  camera(glm::vec3(0.0f, 0.0f, 3.0f));
-GLfloat lastX = WIDTH / 2.0;
-GLfloat lastY = HEIGHT / 2.0;
+GLfloat lastX = screenWidth / 2.0;
+GLfloat lastY = screenHeight / 2.0;
 bool    keys[1024];
 
 // Light attributes
@@ -55,7 +57,7 @@ int main()
 	glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
 	// Create a GLFWwindow object that we can use for GLFW's functions
-	GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "LearnOpenGL", nullptr, nullptr);
+	GLFWwindow* window = glfwCreateWindow(screenWidth, screenHeight, "LearnOpenGL", nullptr, nullptr);
 	glfwMakeContextCurrent(window);
 
 	// Set the required callback functions
@@ -72,7 +74,7 @@ int main()
 	glewInit();
 
 	// Define the viewport dimensions
-	glViewport(0, 0, WIDTH, HEIGHT);
+	glViewport(0, 0, screenWidth, screenHeight);
 
 	// OpenGL options
 	glEnable(GL_DEPTH_TEST);
@@ -127,19 +129,6 @@ int main()
 		-0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  0.0f,
 		-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,  0.0f,  1.0f
 	};
-	// Positions all containers
-	glm::vec3 cubePositions[] = {
-		glm::vec3(0.0f,  0.0f,  0.0f),
-		glm::vec3(2.0f,  5.0f, -15.0f),
-		glm::vec3(-1.5f, -2.2f, -2.5f),
-		glm::vec3(-3.8f, -2.0f, -12.3f),
-		glm::vec3(2.4f, -0.4f, -3.5f),
-		glm::vec3(-1.7f,  3.0f, -7.5f),
-		glm::vec3(1.3f, -2.0f, -2.5f),
-		glm::vec3(1.5f,  2.0f, -2.5f),
-		glm::vec3(1.5f,  0.2f, -1.5f),
-		glm::vec3(-1.3f,  1.0f, -1.5f)
-	};
 	// Positions of the point lights
 	glm::vec3 pointLightPositions[] = {
 		glm::vec3(0.7f,  0.2f,  2.0f),
@@ -176,41 +165,15 @@ int main()
 	glBindVertexArray(0);
 
 
-	// Load textures
-	GLuint diffuseMap, specularMap, emissionMap;
-	glGenTextures(1, &diffuseMap);
-	glGenTextures(1, &specularMap);
-	glGenTextures(1, &emissionMap);
-	int width, height, n;
-	unsigned char* image;
-	// Diffuse map
-	image = stbi_load("Textures/container2.png", &width, &height, &n, 4);
-	glBindTexture(GL_TEXTURE_2D, diffuseMap);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	stbi_image_free(image);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-	// Specular map
-	image = stbi_load("container2_specular.png", &width, &height, &n, 4);
-	glBindTexture(GL_TEXTURE_2D, specularMap);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image);
-	glGenerateMipmap(GL_TEXTURE_2D);
-	stbi_image_free(image);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-	glBindTexture(GL_TEXTURE_2D, 0);
-
-
 	// Set texture units
 	lightingShader.Use();
 	glUniform1i(glGetUniformLocation(lightingShader.Program, "material.diffuse"), 0);
 	glUniform1i(glGetUniformLocation(lightingShader.Program, "material.specular"), 1);
 
+
+
+	// Load models
+	Model ourModel("Models/nanosuit/nanosuit.obj");
 
 	// Game loop
 	while (!glfwWindowShouldClose(window))
@@ -230,7 +193,19 @@ int main()
 
 
 		// Use cooresponding shader when setting uniforms/drawing objects
-		lightingShader.Use();
+		lightingShader.Use();   // <-- Don't forget this one!
+		// Transformation matrices
+		glm::mat4 projectiona = glm::perspective(camera.Zoom, (float)screenWidth / (float)screenHeight, 0.1f, 100.0f);
+		glm::mat4 viewa = camera.GetViewMatrix();
+		glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "projection"), 1, GL_FALSE, glm::value_ptr(projectiona));
+		glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "view"), 1, GL_FALSE, glm::value_ptr(viewa));
+
+		// Draw the loaded model
+		glm::mat4 modela;
+		modela = glm::translate(modela, glm::vec3(0.0f, -1.75f, 0.0f)); // Translate it down a bit so it's at the center of the scene
+		modela = glm::scale(modela, glm::vec3(0.2f, 0.2f, 0.2f));	// It's a bit too big for our scene, so scale it down
+		glUniformMatrix4fv(glGetUniformLocation(lightingShader.Program, "model"), 1, GL_FALSE, glm::value_ptr(modela));
+		ourModel.Draw(lightingShader);
 		GLint viewPosLoc = glGetUniformLocation(lightingShader.Program, "viewPos");
 		glUniform3f(viewPosLoc, camera.Position.x, camera.Position.y, camera.Position.z);
 		// Set material properties
@@ -293,7 +268,7 @@ int main()
 		// Create camera transformations
 		glm::mat4 view;
 		view = camera.GetViewMatrix();
-		glm::mat4 projection = glm::perspective(camera.Zoom, (GLfloat)WIDTH / (GLfloat)HEIGHT, 0.1f, 100.0f);
+		glm::mat4 projection = glm::perspective(camera.Zoom, (GLfloat)screenWidth / (GLfloat)screenHeight, 0.1f, 100.0f);
 		// Get the uniform locations
 		GLint modelLoc = glGetUniformLocation(lightingShader.Program, "model");
 		GLint viewLoc = glGetUniformLocation(lightingShader.Program, "view");
@@ -301,28 +276,8 @@ int main()
 		// Pass the matrices to the shader
 		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 		glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-		// Bind diffuse map
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, diffuseMap);
-		// Bind specular map
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, specularMap);
-
 		// Draw 10 containers with the same VAO and VBO information; only their world space coordinates differ
 		glm::mat4 model;
-		glBindVertexArray(containerVAO);
-		for (GLuint i = 0; i < 10; i++)
-		{
-			model = glm::mat4();
-			model = glm::translate(model, cubePositions[i]);
-			GLfloat angle = 20.0f * i;
-			model = glm::rotate(model, angle, glm::vec3(1.0f, 0.3f, 0.5f));
-			glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-
-			glDrawArrays(GL_TRIANGLES, 0, 36);
-		}
-		glBindVertexArray(0);
 
 
 		// Also draw the lamp object, again binding the appropriate shader
